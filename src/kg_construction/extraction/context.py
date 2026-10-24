@@ -635,7 +635,7 @@ class TestContextExtractor:
                 })
                 for child in ast.iter_child_nodes(node):
                     if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        func_id = _make_id(f"func_{repo}_{rel_path}_{node.name}_{child.name}")
+                        func_id = _make_id(f"func_{repo}_{rel_path}_{node.name}.{child.name}")
                         func_metadata = _build_func_metadata(
                             child, rel_path, repo, parent_class=node.name,
                             import_map=import_map, source_lines=source_lines,

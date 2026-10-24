@@ -228,3 +228,24 @@ class TestCommitMatchingAcceptsShortSha:
         assert b.load("o/r", "a") is None
 
 
+class TestNewFileSeedIds:
+    def test_method_seed_id_matches_builder_qualname_scheme(self):
+        patch_text = (
+            "diff --git a/new.py b/new.py\n"
+            "new file mode 100644\n"
+            "--- /dev/null\n"
+            "+++ b/new.py\n"
+            "@@ -0,0 +1,3 @@\n"
+            "+class K:\n"
+            "+    def m(self):\n"
+            "+        return 1\n"
+        )
+        kg = {"nodes": [], "edges": [], "metadata": {}}
+        ctx = TestContextExtractor(KGQueryEngine(kg), repo_manager=_FakeRepoManager("")).extract({
+            "repo": REPO, "base_commit": "deadbeef", "patch": patch_text,
+            "code_file": "new.py", "test_file": "t.py",
+        })
+        method = next(s for s in ctx.seeds if s["label"] == "m")
+        assert method["id"] == _make_id(f"func_{REPO}_new.py_K.m")
+
+
