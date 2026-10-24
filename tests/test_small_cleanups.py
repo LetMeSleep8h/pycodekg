@@ -198,3 +198,33 @@ class TestSavedContextKeepsStaleSeedLabels:
         assert TestContext.load(str(path)).stale_seed_labels == []
 
 
+class TestCommitMatchingAcceptsShortSha:
+    def _builder(self, tmp_path):
+        return RepoKGBuilder(output_dir=tmp_path / "out", cache_dir=tmp_path / "rc")
+
+    def _kg(self, commit):
+        from kg_construction.kg.builder import SCHEMA_VERSION
+        return {"nodes": [], "edges": [],
+                "metadata": {"base_commit": commit, "schema_version": SCHEMA_VERSION}}
+
+    def test_full_saved_short_loaded(self, tmp_path):
+        b = self._builder(tmp_path)
+        b.save("o/r", self._kg("a" * 40))
+        assert b.load("o/r", "a" * 8) is not None
+
+    def test_short_saved_full_loaded(self, tmp_path):
+        b = self._builder(tmp_path)
+        b.save("o/r", self._kg("a" * 8))
+        assert b.load("o/r", "a" * 40) is not None
+
+    def test_different_commit_with_same_first_eight_is_rejected(self, tmp_path):
+        b = self._builder(tmp_path)
+        b.save("o/r", self._kg("a" * 8 + "1" * 32))
+        assert b.load("o/r", "a" * 8 + "2" * 32) is None
+
+    def test_too_short_a_prefix_is_rejected(self, tmp_path):
+        b = self._builder(tmp_path)
+        b.save("o/r", self._kg("a" * 40))
+        assert b.load("o/r", "a") is None
+
+
