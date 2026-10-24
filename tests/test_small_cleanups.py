@@ -121,3 +121,61 @@ class TestCodeFileLookupIsExact:
         assert json.loads(capsys.readouterr().out)["file"]["metadata"]["path"] == "pkg/mod.py"
 
 
+class TestBuildCommandValidatesPath:
+    def _run(self, argv):
+        args = build_parser().parse_args(argv)
+        with patch("kg_construction.cli.RepoKGBuilder") as builder_cls:
+            instance = builder_cls.return_value
+            instance.build_from_dir.return_value = {"nodes": [], "edges": [], "metadata": {}}
+            code = _cmd_build(args)
+        return code, instance
+
+    def test_missing_path_fails_and_saves_nothing(self, tmp_path, capsys):
+        code, instance = self._run(["build", str(tmp_path / "nope")])
+        assert code != 0
+        assert "does not exist" in capsys.readouterr().err
+        instance.build_from_dir.assert_not_called()
+        instance.save_local.assert_not_called()
+
+    def test_owner_name_without_commit_hints_at_the_commit_option(self, capsys):
+        code, instance = self._run(["build", "psf/requests"])
+        assert code != 0
+        err = capsys.readouterr().err
+        assert "commit" in err
+        instance.save_local.assert_not_called()
+
+    def test_file_instead_of_directory_fails(self, tmp_path, capsys):
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        code, instance = self._run(["build", str(f)])
+        assert code != 0
+        assert "not a directory" in capsys.readouterr().err
+        instance.save_local.assert_not_called()
+
+    def test_directory_with_no_python_files_fails_and_saves_nothing(self, tmp_path, capsys):
+        d = tmp_path / "empty"
+        d.mkdir()
+        args = build_parser().parse_args(["build", str(d)])
+        with patch("kg_construction.cli.RepoKGBuilder") as builder_cls:
+            instance = builder_cls.return_value
+            instance.build_from_dir.return_value = {
+                "nodes": [], "edges": [], "metadata": {"file_count": 0}}
+            code = _cmd_build(args)
+        assert code != 0
+        assert "no Python files" in capsys.readouterr().err
+        instance.save_local.assert_not_called()
+
+    def test_real_directory_still_builds_and_saves(self, tmp_path):
+        d = tmp_path / "ok"
+        d.mkdir()
+        (d / "a.py").write_text("def f(): pass\n")
+        args = build_parser().parse_args(["build", str(d), "--name", "ok-repo"])
+        with patch("kg_construction.cli.RepoKGBuilder") as builder_cls:
+            instance = builder_cls.return_value
+            instance.build_from_dir.return_value = {
+                "nodes": [{}], "edges": [], "metadata": {"file_count": 1}}
+            code = _cmd_build(args)
+        assert code == 0
+        instance.save_local.assert_called_once()
+
+
