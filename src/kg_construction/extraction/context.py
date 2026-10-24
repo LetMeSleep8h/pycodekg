@@ -452,10 +452,14 @@ class TestContextExtractor:
         # handle_401 -- most were tests of other functions/methods nearby.
         seed_id_set = set(seed_ids)
         test_nodes = []
+        seen_test_ids: Set[str] = set()
         for edge in subgraph_edges:
             if edge['relation'] == 'tests' and edge['target'] in seed_id_set:
                 test_node = self.engine.nodes_by_id.get(edge['source'])
-                if test_node:
+                # A test that exercises several seeds has one edge per
+                # seed, but should be listed once.
+                if test_node and test_node['id'] not in seen_test_ids:
+                    seen_test_ids.add(test_node['id'])
                     test_nodes.append(test_node)
 
         # Separate seeds from context

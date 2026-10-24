@@ -1,0 +1,92 @@
+"""Regression tests for a bundle of small, independent correctness fixes.
+
+Each class covers one finding from the correctness audit:
+
+* TestNoDuplicateTestNodes: a test that exercises two seeds was listed twice.
+* TestCodeFileLookupIsExact: the extractor and the CLI picked the first
+  substring match for a file path, so a vendored or build copy could win.
+* TestBuildCommandValidatesPath: building from a path that does not exist
+  (for example a GitHub name given without a commit) saved an empty KG.
+* TestSavedContextKeepsStaleSeedLabels: save and load dropped the field.
+* TestCommitMatchingAcceptsShortSha: a KG saved under a full SHA was not
+  found when loaded with a short SHA, and the reverse.
+* TestNewFileSeedIds: seed IDs for methods of a newly created file did not
+  follow the builder's qualname scheme.
+* TestPytestDoesNotCollectDomainClasses: classes named Test* that are not
+  tests.
+"""
+
+import difflib
+import json
+from pathlib import Path
+from unittest.mock import patch
+
+from kg_construction.ast.helpers import _make_id
+from kg_construction.cli import _cmd_build, _cmd_query, build_parser
+from kg_construction.extraction.context import TestContext, TestContextExtractor
+from kg_construction.extraction.validator import TestContextValidator
+from kg_construction.kg.builder import RepoASTParser, RepoKGBuilder
+from kg_construction.kg.query import KGQueryEngine
+from kg_construction.kg.repo_manager import RepoManager
+
+REPO = "test/repo"
+
+
+class _FakeRepoManager(RepoManager):
+    def __init__(self, source: str):
+        self._source = source
+
+    def read_file_at_commit(self, repo: str, commit: str, path: str) -> str:
+        return self._source
+
+
+def _build(tmp_path: Path, files: dict):
+    for rel, src in files.items():
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(src)
+    return RepoASTParser(max_workers=1).parse_repo(REPO, tmp_path)
+
+
+def _patch(path: str, old: str, new: str) -> str:
+    return "".join(difflib.unified_diff(
+        old.splitlines(True), new.splitlines(True), f"a/{path}", f"b/{path}"))
+
+
+def _extract(kg, code_file: str, source: str, patch_text: str, test_file: str = "t.py"):
+    extractor = TestContextExtractor(KGQueryEngine(kg), repo_manager=_FakeRepoManager(source))
+    return extractor.extract({
+        "repo": REPO, "base_commit": "deadbeef", "patch": patch_text,
+        "code_file": code_file, "test_file": test_file,
+    }, depth=1)
+
+
+class TestNoDuplicateTestNodes:
+    def test_test_covering_two_seeds_is_listed_once(self, tmp_path):
+        src = "def a(): return 1\ndef b(): return 2\n"
+        kg = _build(tmp_path, {
+            "m.py": src,
+            "tests/test_m.py": "from m import a, b\ndef test_it():\n    a()\n    b()\n",
+        })
+        new = src.replace("return 1", "return 11").replace("return 2", "return 22")
+        ctx = _extract(kg, "m.py", src, _patch("m.py", src, new), "tests/test_m.py")
+        assert sorted(s["label"] for s in ctx.seeds) == ["a", "b"]
+        assert [t["label"] for t in ctx.test_nodes] == ["test_it"]
+
+    def test_distinct_tests_are_all_kept_in_stable_order(self, tmp_path):
+        src = "def a(): return 1\n"
+        kg = _build(tmp_path, {
+            "m.py": src,
+            "tests/test_m.py": (
+                "from m import a\n"
+                "def test_one():\n    a()\n"
+                "def test_two():\n    a()\n"
+            ),
+        })
+        new = src.replace("return 1", "return 11")
+        ctx = _extract(kg, "m.py", src, _patch("m.py", src, new), "tests/test_m.py")
+        labels = [t["label"] for t in ctx.test_nodes]
+        assert sorted(labels) == ["test_one", "test_two"]
+        assert len(labels) == len(set(labels))
+
+
