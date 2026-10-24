@@ -179,3 +179,22 @@ class TestBuildCommandValidatesPath:
         instance.save_local.assert_called_once()
 
 
+class TestSavedContextKeepsStaleSeedLabels:
+    def test_round_trip(self, tmp_path):
+        ctx = TestContext(
+            seeds=[], context_nodes=[], edges=[], test_nodes=[],
+            repo="r", base_commit="c" * 8, stale_seed_labels=["x", "y"],
+        )
+        path = str(tmp_path / "ctx.json")
+        ctx.save(path)
+        assert TestContext.load(path).stale_seed_labels == ["x", "y"]
+
+    def test_older_file_without_the_field_still_loads(self, tmp_path):
+        path = tmp_path / "old.json"
+        path.write_text(json.dumps({
+            "repo": "r", "base_commit": "c" * 8, "seeds": [], "context_nodes": [],
+            "edges": [], "test_nodes": [],
+        }))
+        assert TestContext.load(str(path)).stale_seed_labels == []
+
+

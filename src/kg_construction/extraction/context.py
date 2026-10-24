@@ -113,6 +113,7 @@ class TestContext:
             'context_nodes': self.context_nodes,
             'edges': self.edges,
             'test_nodes': self.test_nodes,
+            'stale_seed_labels': self.stale_seed_labels,
             'stats': {
                 'num_seeds': len(self.seeds),
                 'num_context_nodes': len(self.context_nodes),
@@ -147,6 +148,7 @@ class TestContext:
             test_nodes=data['test_nodes'],
             repo=data['repo'],
             base_commit=data['base_commit'],
+            stale_seed_labels=data.get('stale_seed_labels', []),
             retrieval_time_s=data.get('retrieval_time_s'),
             localization_outcome=data.get('localization_outcome'),
             node_count=data.get('node_count'),
