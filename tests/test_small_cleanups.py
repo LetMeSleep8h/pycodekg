@@ -249,3 +249,8 @@ class TestNewFileSeedIds:
         assert method["id"] == _make_id(f"func_{REPO}_new.py_K.m")
 
 
+class TestPytestDoesNotCollectDomainClasses:
+    def test_marked_as_not_tests(self):
+        assert TestContext.__test__ is False
+        assert TestContextExtractor.__test__ is False
+        assert TestContextValidator.__test__ is False

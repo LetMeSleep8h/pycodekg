@@ -86,6 +86,9 @@ class TestContext:
             data for the paper's callers/callees/siblings/class-related
             breakdown.
     """
+    # Not a test class, despite the name: stops pytest trying to collect it.
+    __test__ = False
+
     seeds: List[Dict]
     context_nodes: List[Dict]
     edges: List[Dict]
@@ -193,6 +196,9 @@ class TestContext:
 
 class TestContextExtractor:
     """Extract KG subgraphs from dataset instances for test generation."""
+
+    # Not a test class, despite the name: stops pytest trying to collect it.
+    __test__ = False
 
     def __init__(self, engine: KGQueryEngine, repo_manager: Optional[RepoManager] = None):
         """
