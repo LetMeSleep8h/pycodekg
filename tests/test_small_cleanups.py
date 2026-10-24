@@ -90,3 +90,34 @@ class TestNoDuplicateTestNodes:
         assert len(labels) == len(set(labels))
 
 
+class TestCodeFileLookupIsExact:
+    def test_fallback_seed_is_the_real_file_not_a_build_copy(self, tmp_path):
+        # The change is to a module level line, so no function resolves and
+        # the extractor falls back to seeding the code file node itself.
+        src = "LIMIT = 1\n\n\ndef a():\n    return 1\n"
+        kg = _build(tmp_path, {"build/lib/pkg/mod.py": src, "pkg/mod.py": src})
+        new = src.replace("LIMIT = 1", "LIMIT = 2")
+        ctx = _extract(kg, "pkg/mod.py", src, _patch("pkg/mod.py", src, new))
+        assert [s["metadata"]["path"] for s in ctx.seeds] == ["pkg/mod.py"]
+
+    def test_cli_file_query_prefers_exact_path_over_substring(self, tmp_path, capsys):
+        kg = _build(tmp_path / "repo", {
+            "build/lib/pkg/mod.py": "def a(): pass\n",
+            "pkg/mod.py": "def a(): pass\n",
+        })
+        kg_file = tmp_path / "kg.json"
+        kg_file.write_text(json.dumps(kg))
+        args = build_parser().parse_args(["query", str(kg_file), "--file", "pkg/mod.py", "--json"])
+        assert _cmd_query(args) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["file"]["metadata"]["path"] == "pkg/mod.py"
+
+    def test_cli_file_query_still_accepts_a_partial_path(self, tmp_path, capsys):
+        kg = _build(tmp_path / "repo", {"pkg/mod.py": "def a(): pass\n"})
+        kg_file = tmp_path / "kg.json"
+        kg_file.write_text(json.dumps(kg))
+        args = build_parser().parse_args(["query", str(kg_file), "--file", "mod.py", "--json"])
+        assert _cmd_query(args) == 0
+        assert json.loads(capsys.readouterr().out)["file"]["metadata"]["path"] == "pkg/mod.py"
+
+

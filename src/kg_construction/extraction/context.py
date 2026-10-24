@@ -322,7 +322,7 @@ class TestContextExtractor:
                 post_patch_by_qualname, post_patch_ranges = self._index_post_patch_defs(post_tree)
 
         # Find the code file node
-        code_file_results = self.engine.find_file_by_path(instance['code_file'])
+        code_file_results = self.engine.find_file(instance['code_file'])
         if not code_file_results:
             raise ValueError(f"Code file not found: {instance['code_file']}")
         code_file_node = code_file_results[0]

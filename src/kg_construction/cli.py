@@ -124,7 +124,7 @@ def _cmd_query(args: argparse.Namespace) -> int:
         return 0
 
     if args.file:
-        file_matches = engine.find_file_by_path(args.file)
+        file_matches = engine.find_file(args.file)
         if not file_matches:
             print(f"No file matching '{args.file}' found in this KG.", file=sys.stderr)
             return 1
